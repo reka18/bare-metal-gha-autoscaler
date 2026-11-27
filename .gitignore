@@ -12,3 +12,6 @@ scaler.properties
 *.pem
 *.p12
 *.jks
+
+# Built by deploy/macos-launchd/build.sh
+deploy/macos-launchd/dist/
