@@ -105,7 +105,10 @@ chmod +x "$SCRIPT_DIR/autoscaler.sh"
 
 echo "Launching Autoscaler daemon in the background..."
 
-nohup "$SCRIPT_DIR/autoscaler.sh" > "$SCRIPT_DIR/autoscaler.log" 2>&1 &
+# Ignore SIGHUP the way nohup does, without nohup itself: macOS nohup fails
+# under launchd ("can't detach from console") because a daemon has no console.
+# exec keeps the PID, so $! is the child's own PID.
+( trap '' HUP; exec "$SCRIPT_DIR/autoscaler.sh" ) > "$SCRIPT_DIR/autoscaler.log" 2>&1 &
 PID=$!
 echo $PID > "$SCRIPT_DIR/autoscaler.pid"
 

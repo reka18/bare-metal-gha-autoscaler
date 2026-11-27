@@ -210,7 +210,10 @@ while true; do
 
         echo "[Autoscaler] Machine ${MACHINE_HASH} has $IDLE_COUNT idle runner(s). Scaling UP Runner $i..."
 
-        nohup "$SCRIPT_DIR/runner-loop.sh" "$RUNNER_PATH" "$i" > "$SCRIPT_DIR/runner-${i}.log" 2>&1 &
+        # Ignore SIGHUP the way nohup does, without nohup itself: macOS nohup fails
+        # under launchd ("can't detach from console") because a daemon has no console.
+        # exec keeps the PID, so $! is the child's own PID.
+        ( trap '' HUP; exec "$SCRIPT_DIR/runner-loop.sh" "$RUNNER_PATH" "$i" ) > "$SCRIPT_DIR/runner-${i}.log" 2>&1 &
         echo $! > "$SCRIPT_DIR/runner-${i}.pid"
 
         # Give GitHub a moment to register the new runner before polling again
