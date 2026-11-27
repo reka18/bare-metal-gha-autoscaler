@@ -33,7 +33,7 @@ case "$(uname -m)" in
   arm64|aarch64)  ARCH_NAME="arm64" ;;
   *) echo "[Autoscaler] Unsupported arch: $(uname -m)"; exit 1 ;;
 esac
-RUNNER_VERSION="2.333.0"
+RUNNER_VERSION="2.338.2"
 TARBALL_PATH="$SCRIPT_DIR/actions-runner-${OS}-${ARCH_NAME}-${RUNNER_VERSION}.tar.gz"
 
 # ensure_runner_dir <index>

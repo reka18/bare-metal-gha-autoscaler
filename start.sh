@@ -54,7 +54,7 @@ case $ARCH in
 esac
 
 # Formulate payload variables
-RUNNER_VERSION="2.333.0"
+RUNNER_VERSION="2.338.2"
 TARBALL="actions-runner-${OS}-${ARCH_NAME}-${RUNNER_VERSION}.tar.gz"
 DOWNLOAD_URL="https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/${TARBALL}"
 TARBALL_PATH="$SCRIPT_DIR/$TARBALL"
