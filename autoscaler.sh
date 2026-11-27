@@ -210,7 +210,10 @@ while true; do
 
         echo "[Autoscaler] Machine ${MACHINE_HASH} has $IDLE_COUNT idle runner(s). Scaling UP Runner $i..."
 
-        nohup "$SCRIPT_DIR/runner-loop.sh" "$RUNNER_PATH" "$i" > "$SCRIPT_DIR/runner-${i}.log" 2>&1 &
+        # Ignore SIGHUP the way nohup does, without nohup itself: macOS nohup fails
+        # under launchd ("can't detach from console") because a daemon has no console.
+        # exec keeps the PID, so $! is the child's own PID.
+        ( trap '' HUP; exec "$SCRIPT_DIR/runner-loop.sh" "$RUNNER_PATH" "$i" ) > "$SCRIPT_DIR/runner-${i}.log" 2>&1 &
         echo $! > "$SCRIPT_DIR/runner-${i}.pid"
 
         # Give GitHub a moment to register the new runner before polling again
@@ -225,10 +228,20 @@ while true; do
   # idle runners with no local pid file would cause a busy loop of empty
   # "Scaling DOWN Runner " messages.
   if [ "$IDLE_COUNT" -gt "$MIN_IDLE" ] && [ "${#ALL_RUNNING_INDEXES[@]}" -gt 0 ]; then
-    # Grab the highest index we are locally running
+    # Pick the highest-index runner that GitHub reports idle AND that has no
+    # local Runner.Worker (a job in flight). Killing a busy runner's listener
+    # orphans its job: GitHub marks the runner offline and the job is lost.
+    IDLE_NAMES=$(echo "$API_RESPONSE" | jq -r --arg pfx "$RUNNER_NAME_PREFIX_MATCH" --arg sfx "$RUNNER_NAME_SUFFIX" '.runners[] | select(.name | startswith($pfx)) | select(.name | endswith($sfx)) | select(.status == "online" and .busy == false) | .name')
+    KILL_INDEX=""
     IFS=$'\n' sorted=($(sort -nr <<<"${ALL_RUNNING_INDEXES[*]}")); unset IFS
-    KILL_INDEX=${sorted[0]}
-
+    for i in "${sorted[@]}"; do
+      if grep -qx "${RUNNER_NAME_PREFIX_MATCH}${i}${RUNNER_NAME_SUFFIX}" <<<"$IDLE_NAMES" \
+         && ! pgrep -f "$SCRIPT_DIR/actions-runner-${i}/bin[^/]*/Runner.Worker" >/dev/null; then
+        KILL_INDEX=$i; break
+      fi
+    done
+  fi
+  if [ -n "${KILL_INDEX:-}" ]; then
     echo "[Autoscaler] Machine ${MACHINE_HASH} has $IDLE_COUNT idle runner(s). Scaling DOWN Runner $KILL_INDEX..."
 
     # Signal the listener to deregister first so GitHub marks it offline.

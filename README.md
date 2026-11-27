@@ -55,6 +55,8 @@ Run `direnv allow` once, and again after any edit. Outside a direnv shell, use `
 | --- | --- | --- |
 | `GH_RUNNER_NAME_PREFIX` | `baremetal-runner` | Prefix used when registering each runner. Final name is `${prefix}-<N>-<machine-hash>`. |
 | `GH_RUNNER_GROUP` | *(unset — uses org default)* | If set, passed to `config.sh` as `--runnergroup`. |
+| `GH_RUNNER_LABELS` | *(unset — default labels only)* | Comma-separated custom labels, passed to `config.sh` as `--labels`. Added to `self-hosted`, the OS and the architecture. |
+| `GH_RUNNER_CARGO_TARGET_BASE` | *(unset — Cargo default)* | If set, each runner slot N gets `CARGO_TARGET_DIR=<base>/N`, created on start and kept across jobs, so Rust builds stay warm after `actions/checkout` cleans the work tree. |
 
 ### 2. Tune your Hardware Capacities
 Copy `scaler.properties.example` to `scaler.properties` and optimize the maximum compute limit for your specific hardware. Each checkout keeps its own gitignored copy, so two fleets on one host can have different limits. Without one, the scripts use the defaults below.
@@ -93,6 +95,19 @@ loginctl enable-linger
 ```
 
 From then on, stop and start that fleet with `systemctl --user`. It restarts only at boot, not after a crash, so a manual `./stop.sh` stays stopped.
+
+## Running as a Dedicated User
+
+The user unit above runs jobs as your own account, with your home, caches and credentials. To isolate a fleet, run it as its own unprivileged user instead. Both scripts are run from a checkout and copy that checkout's code into the fleet user's home.
+
+**Linux (systemd system service):**
+```bash
+sudo FLEET_USER=gha-runner GH_RUNNER_ORG=my-org GH_RUNNER_LABELS=my-label \
+  bash deploy/linux-systemd/setup.sh
+```
+This creates the user (locked password, no extra groups), installs rustup for it, stores the token in `/etc/$FLEET_USER/fleet.env` (root-only; systemd loads it), and installs `gha-fleet-$FLEET_USER.service` with `NoNewPrivileges`. `HIDE_PATHS` makes other paths, such as other users' homes, inaccessible to the service. To ship later script changes, run `sudo FLEET_USER=gha-runner bash deploy/linux-systemd/update.sh`, which restarts the fleet only when no job is running.
+
+**macOS (launchd daemon):** `deploy/macos-launchd/build.sh` produces `dist/setup-gha-macos.sh`, one file with the fleet code embedded. Copy it to the Mac and run `sudo bash setup-gha-macos.sh`. It creates a hidden standard user `gha-macos`, prompts for the token, and installs `/Library/LaunchDaemons/com.skepticdog.gha-fleet.plist`. It needs `jq` (`brew install jq`). The org, labels and runner limits are set near the top of `setup.head.sh`.
 
 ## Multi-Machine Deployments
 
