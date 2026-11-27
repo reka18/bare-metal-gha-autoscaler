@@ -72,8 +72,13 @@ while true; do
   if [ -n "${GH_RUNNER_GROUP:-}" ]; then
     CONFIG_ARGS+=(--runnergroup "$GH_RUNNER_GROUP")
   fi
+  if [ -n "${GH_RUNNER_LABELS:-}" ]; then
+    CONFIG_ARGS+=(--labels "$GH_RUNNER_LABELS")
+  fi
 
-  ./config.sh "${CONFIG_ARGS[@]}"
+  # The runner hands its environment to every job step, so keep the PAT out of
+  # it: config.sh only needs the short-lived registration token.
+  env -u GH_RUNNER_PAT ./config.sh "${CONFIG_ARGS[@]}"
 
   if [ $? -ne 0 ]; then
      echo "[Runner $RUNNER_ID] ERROR configuring runner. Retrying in 30 seconds..."
@@ -84,7 +89,7 @@ while true; do
   echo "[Runner $RUNNER_ID] Configuration complete. Listening for one job..."
   
   # When run.sh completes, it naturally exits after exactly 1 job due to --ephemeral
-  ./run.sh
+  env -u GH_RUNNER_PAT ./run.sh
 
   echo "[Runner $RUNNER_ID] Ephemeral run finished! Resetting in 5 seconds..."
   sleep 5

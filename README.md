@@ -55,6 +55,7 @@ Run `direnv allow` once, and again after any edit. Outside a direnv shell, use `
 | --- | --- | --- |
 | `GH_RUNNER_NAME_PREFIX` | `baremetal-runner` | Prefix used when registering each runner. Final name is `${prefix}-<N>-<machine-hash>`. |
 | `GH_RUNNER_GROUP` | *(unset — uses org default)* | If set, passed to `config.sh` as `--runnergroup`. |
+| `GH_RUNNER_LABELS` | *(unset — default labels only)* | Comma-separated custom labels, passed to `config.sh` as `--labels`. Added to `self-hosted`, the OS and the architecture. |
 
 ### 2. Tune your Hardware Capacities
 Copy `scaler.properties.example` to `scaler.properties` and optimize the maximum compute limit for your specific hardware. Each checkout keeps its own gitignored copy, so two fleets on one host can have different limits. Without one, the scripts use the defaults below.
