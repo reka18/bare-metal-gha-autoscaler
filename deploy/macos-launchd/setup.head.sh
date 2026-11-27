@@ -4,7 +4,8 @@
 #
 # Sets up an ephemeral GitHub Actions runner fleet for the SkepticDogSoftware org,
 # running as a hidden, non-admin user under launchd, via the same autoscaler
-# scripts as the Linux fleet: two runner instances, each taking one job at a time.
+# scripts as the Linux fleet: one runner instance, taking one job at a time (the
+# Mac also runs simulators and agent work, so it shares the machine lightly).
 # gha-macos's shell and the launchd entry point are zsh; the fleet scripts
 # themselves stay bash (they use bash arrays).
 # Labels: self-hosted, macOS, ARM64, skeptic-macmini.
@@ -63,7 +64,7 @@ echo "== 3. fleet code -> $FLEET"
 if [ -f "$FLEET/stop.sh" ]; then sudo -u "$U" -H "$FLEET/stop.sh" >/dev/null 2>&1 || true; fi
 mkdir -p "$FLEET"
 sed -n '/^__FLEET_TGZ_BASE64__$/,$p' "$0" | tail -n +2 | base64 -D | tar -xzf - -C "$FLEET"
-printf 'MAX_RUNNERS=2\nMIN_IDLE=2\nPOLL_INTERVAL=15\n' > "$FLEET/scaler.properties"
+printf 'MAX_RUNNERS=1\nMIN_IDLE=1\nPOLL_INTERVAL=15\n' > "$FLEET/scaler.properties"
 cat > "$FLEET/launchd-start.sh" <<EOF
 #!/bin/zsh
 # Started by launchd ($LABEL). Loads the token and runs the autoscaler.
@@ -99,13 +100,12 @@ chown root:wheel "$PLIST"; chmod 644 "$PLIST"
 launchctl bootout "system/$LABEL" 2>/dev/null || true
 launchctl bootstrap system "$PLIST"
 
-echo "== 5. waiting for the runner to register (up to 3 min; the second starts ~10 s after the first)"
+echo "== 5. waiting for the runner to register (up to 3 min)"
 for i in $(seq 1 36); do
   sleep 5
-  n=0; for r in 1 2; do grep -q 'Listening for Jobs' "$FLEET/runner-$r.log" 2>/dev/null && n=$((n+1)); done
-  [ $n -eq 2 ] && break
+  grep -q 'Listening for Jobs' "$FLEET/runner-1.log" 2>/dev/null && break
 done
-for r in 1 2; do
+for r in 1; do
   if grep -q 'Listening for Jobs' "$FLEET/runner-$r.log" 2>/dev/null; then echo "runner $r online"; else echo "runner $r not online yet; see $FLEET/runner-$r.log, autoscaler.log, launchd.log"; fi
 done
 echo "== done. Stop: sudo -u $U $FLEET/stop.sh   Restart: stop first, then sudo launchctl kickstart -k system/$LABEL"
